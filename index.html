@@ -325,14 +325,14 @@ const CATICON = { spot:'📍', food:'🍴', cafe:'☕', game:'🎲' };
 const ETCICON = { station:'🚇', bus:'🚌', wc:'🚻', locker:'🧳' };
 const KEY = 'be-course-check-v2';
 let checks = JSON.parse(localStorage.getItem(KEY) || '{}');
-const FKEY = 'be-favs';
+const FKEY = 'be-favs-v2';
 let favs = JSON.parse(localStorage.getItem(FKEY) || '{}');
 function favKey(s){ return s[0]; }
 
 // ---- 닉네임 & 익명 투표 집계 ----
 const NICKKEY = 'be-nick';
 const ADMIN_NICK = '투넬';
-const VOTE_NS = 'bongeunsa-bung-0809-hs';
+const VOTE_NS = 'bongeunsa-bung-0809-hs-v2';
 const VOTE_API = 'https://api.counterapi.dev/v1/' + VOTE_NS;
 let nick = localStorage.getItem(NICKKEY) || '';
 let VOTES = {};
@@ -443,7 +443,7 @@ function favToggle(k){
 }
 
 // ---- 저녁 루트 투표 (3지선다 · 익명 · 1인 1표) ----
-const RKEY = 'be-route';
+const RKEY = 'be-route-v2';
 const ROUTE_LABEL = { j:'잠실 이동', s:'삼성에서 마무리', x:'상관없음' };
 let myRoute = localStorage.getItem(RKEY) || '';
 async function voteRoute(k){
