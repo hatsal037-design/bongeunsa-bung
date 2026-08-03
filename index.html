@@ -346,7 +346,8 @@ function allPlaces(){
   CATS.forEach(c=>{ (DATA[c]||[]).forEach(s=>out.push(s)); });
   return out;
 }
-function isAdmin(){ return nick === ADMIN_NICK; }
+function normNick(v){ return (v||'').replace(/\s+/g,' ').trim().slice(0,12); } // 공백 정리 + 12자 제한
+function isAdmin(){ return nick.replace(/\s/g,'') === ADMIN_NICK; } // 공백 섞여도 관리자 확실히 판별
 // 온보딩 슬라이드
 const NSLIDES = [
   { e:'🪷', t:'봉은사 벙에 어서오세요!', d:'8/9(일) 모임 준비 앱이에요.<br>갈 만한 후보 장소들을 지도와 목록으로<br>미리 구경할 수 있어요.' },
@@ -380,10 +381,11 @@ function renderNickModal(){
 }
 function enterNick(){
   const el = document.getElementById('nickInput');
-  const v = el ? el.value.trim() : '';
-  if (!v) { if(el) el.focus(); return; }
+  const v = normNick(el ? el.value : '');
+  if (!v) { if(el){ el.value=''; el.focus(); } return; }
   nick = v;
   localStorage.setItem(NICKKEY, nick);
+  localStorage.setItem(NICKKEY + '-last', nick); // 입장 즉시 기기에 기억
   applyNick();
 }
 function resetNick(){
