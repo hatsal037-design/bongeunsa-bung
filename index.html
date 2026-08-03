@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>봉은사 벙 · 8/9</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;900&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  /* ─ 봉은사 무드: 한지 · 먹 · 단청그린 (시안 B) ─ */
+  :root { --bg:#f3efe6; --card:#fbf8f1; --line:#ded5c2; --ink:#2b2620; --sub:#7a7264;
+          --green:#2f4f42; --warm:#8a5a2b; --gold:#c9972a; --spring:cubic-bezier(0.32,0.72,0,1); }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html { -webkit-font-smoothing:antialiased; }
+  body { font-family:"Noto Sans KR",-apple-system,"Apple SD Gothic Neo",sans-serif; color:var(--ink); background:var(--bg);
+         background-image:radial-gradient(rgba(60,50,40,.035) 1px, transparent 1px); background-size:5px 5px;
+         padding-bottom:calc(12px + env(safe-area-inset-bottom)); }
+  button, a, input { font-family:inherit; }
+  header { padding:calc(16px + env(safe-area-inset-top)) 18px 10px; }
+  header h1 { font-family:"Noto Serif KR",serif; font-size:25px; font-weight:900; letter-spacing:-0.01em; }
+  header .sub { font-size:12px; color:var(--sub); margin-top:4px; line-height:1.6; }
+  .wx { font-size:11px; color:var(--sub); background:var(--card); border:1px solid var(--line); border-radius:5px;
+        padding:9px 12px; margin:10px 18px 0; line-height:1.65; }
+
+  .cattabs { display:flex; margin:12px 14px; background:var(--card); border:1px solid var(--line); border-radius:5px;
+             overflow:hidden; position:sticky; top:8px; z-index:1000; box-shadow:3px 3px 0 var(--line); }
+  .ctab { flex:1; text-align:center; padding:11px 0 10px; font-size:13px; font-weight:500; color:var(--sub);
+          cursor:pointer; transition:color 150ms ease, background 150ms ease; }
+  .ctab:active { background:rgba(47,79,66,.08); }
+  .ctab.on { color:#f3efe6; background:var(--green); font-weight:700; }
+
+  .daydesc { font-size:12.5px; color:var(--sub); padding:10px 18px 0; line-height:1.65; }
+  .daydesc b { color:var(--ink); font-weight:700; }
+  #map { height:300px; margin:12px 14px; border-radius:6px; border:1px solid var(--line); }
+  #list { margin:0 14px 12px; }
+  .stop { display:flex; align-items:center; gap:10px; padding:13px 13px; margin-bottom:9px;
+          background:var(--card); border:1px solid var(--line); border-radius:5px;
+          transition:background 150ms ease, box-shadow 200ms var(--spring), border-color 150ms ease; }
+  .stop:active { background:#f5f1e6; }
+  .stop.done { background:#f2f5ef; border:1.5px solid var(--green); box-shadow:3px 3px 0 #c9d4c9; }
+  .stop.done .nm { color:var(--ink); }
+  .stop.sel { background:#f5f1e6; border-color:var(--warm); }
+  .stop.done.sel { background:#f2f5ef; border-color:var(--green); }
+  .cbadge { font-size:9px; font-weight:700; color:#f3efe6; background:var(--green); border-radius:2px;
+            padding:2.5px 7px; margin-left:6px; vertical-align:1.5px; letter-spacing:0.04em; }
+  .chk { width:26px; height:26px; border-radius:50%; border:1.5px solid #b5aa93; flex:none; display:flex;
+         align-items:center; justify-content:center; font-size:13px; color:#f3efe6; cursor:pointer;
+         transition:background 180ms var(--spring), border-color 180ms ease, transform 120ms ease; }
+  .chk:active { transform:scale(0.88); }
+  .stop.done .chk { border-color:var(--green); background:var(--green); }
+  .num { width:24px; height:24px; border-radius:50%; color:#f3efe6; font-size:12px; font-weight:700; flex:none;
+         display:flex; align-items:center; justify-content:center; background:var(--warm); }
+  .num.ico { background:#efe9db; color:var(--ink); border:none; border-radius:4px; font-size:12px; }
+  .info { flex:1; min-width:0; cursor:pointer; }
+  .nm { font-family:"Noto Serif KR",serif; font-size:15px; font-weight:600; letter-spacing:-0.005em; }
+  .star { color:#cfc5ae; cursor:pointer; margin-right:5px; font-size:17px; vertical-align:-1px;
+          transition:color 150ms ease, transform 150ms var(--spring); display:inline-block; font-family:"Noto Sans KR",sans-serif; }
+  .star:active { transform:scale(1.25); }
+  .star.on { color:var(--gold); }
+  .memo { font-size:11.5px; color:var(--sub); margin-top:2px; line-height:1.55; }
+  .tagx { font-size:9px; font-weight:500; border-radius:2px; padding:2px 6px; margin-left:5px; vertical-align:1.5px;
+          color:var(--sub); background:#efe9db; border:1px solid var(--line); }
+  .t-indoor, .t-outdoor, .t-view, .t-check { background:#efe9db; color:var(--sub); }
+  .btns { display:flex; gap:5px; flex:none; }
+  .btns a { display:flex; align-items:center; justify-content:center; width:32px; height:76px; border-radius:3px;
+            font-size:11px; font-weight:600; text-decoration:none; border:1px solid transparent;
+            writing-mode:vertical-rl; text-orientation:upright; letter-spacing:2px;
+            transition:transform 120ms ease, filter 150ms ease; }
+  .btns a:active { transform:translate(1px,1px); filter:brightness(0.95); }
+  .b-menu { background:var(--ink); color:#f3efe6; }
+  .b-map { background:#fff; color:#8a6d00; border-color:#e0cf7a; }
+  .b-nvr { background:#fff; color:#2f6f4f; border-color:#a8c9b0; }
+  .b-note { background:#fff; color:#a89e8c; border-color:var(--line); }
+  .b-note.has { background:#faf4e4; color:#8a6d1a; border-color:#e0cf7a; }
+  .unote { font-size:11.5px; color:#8a6d1a; background:#faf4e4; border:1px solid #eadfc2; border-radius:3px;
+           padding:4px 9px; margin-top:5px; display:inline-block; white-space:pre-wrap; }
+  footer { text-align:center; font-size:10.5px; color:#a89e8c; padding:6px 14px 20px; line-height:1.7; }
+  footer a { color:#8a7a5f; }
+
+  .overlay { position:fixed; inset:0; background:rgba(43,38,32,.5);
+             z-index:3000; display:flex; align-items:center; justify-content:center; padding:24px;
+             animation:ovIn 260ms var(--spring); }
+  @keyframes ovIn { from { opacity:0; } to { opacity:1; } }
+  .modal { background:var(--card); border:1px solid var(--line); border-radius:6px; padding:28px 22px 20px;
+           width:100%; max-width:330px; box-shadow:6px 6px 0 rgba(60,50,40,.18); text-align:center;
+           animation:mdIn 320ms var(--spring); }
+  @keyframes mdIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+  .modal h2 { font-family:"Noto Serif KR",serif; font-size:19px; font-weight:900; margin-bottom:8px; }
+  .modal p { font-size:12.5px; color:var(--sub); line-height:1.7; margin-bottom:16px; }
+  .modal input { width:100%; border:1px solid #cfc5ae; border-radius:4px; padding:12px 12px; font-size:16px; text-align:center;
+                 outline:none; background:#fff; transition:border-color 150ms ease; }
+  .modal input:focus { border-color:var(--green); }
+  .modal button { width:100%; margin-top:12px; border:none; border-radius:4px; padding:13px 0; font-size:15px; font-weight:700;
+                  color:#f3efe6; background:var(--green); cursor:pointer;
+                  transition:transform 120ms ease, filter 150ms ease; }
+  .modal button:active { transform:translate(1px,1px); filter:brightness(1.15); }
+  .vbadge { font-size:10px; font-weight:700; color:#f3efe6; background:#a3403a; border-radius:2px; padding:2px 6.5px; margin-left:5px; vertical-align:1px; }
+  .adminbox { margin:0 14px 12px; background:var(--card); border:1px solid var(--line); border-radius:5px; padding:13px 15px;
+              box-shadow:3px 3px 0 var(--line); }
+  .adminbox .ttl { font-family:"Noto Serif KR",serif; font-size:13px; font-weight:900; color:var(--green); margin-bottom:8px;
+                   display:flex; justify-content:space-between; align-items:center; }
+  .adminbox .ttl button { border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:3px; padding:5px 11px;
+                          font-size:10.5px; font-weight:500; cursor:pointer; font-family:"Noto Sans KR",sans-serif;
+                          transition:transform 120ms ease; }
+  .adminbox .ttl button:active { transform:translate(1px,1px); }
+  .adminbox .rowv { display:flex; justify-content:space-between; font-size:12.5px; padding:4.5px 0; border-bottom:1px dashed var(--line); }
+  .adminbox .rowv:last-child { border-bottom:none; }
+  .adminbox .rowv b { color:#a3403a; font-weight:700; }
+  .adminbox .empty { font-size:11.5px; color:var(--sub); }
+  .mrow { display:flex; justify-content:space-between; gap:12px; font-size:13.5px; padding:9px 2px; border-bottom:1px dashed var(--line); text-align:left; }
+  .mrow:last-child { border-bottom:none; }
+  .mrow b { color:var(--green); white-space:nowrap; font-weight:700; }
+  .mnote { font-size:11px; color:var(--sub); margin-top:9px; text-align:left; line-height:1.6; }
+  .mclose { width:100%; margin-top:15px; border:none; border-radius:4px; padding:12px 0; font-size:14px; font-weight:700;
+            color:#f3efe6; background:var(--ink); cursor:pointer; transition:transform 120ms ease; }
+  .mclose:active { transform:translate(1px,1px); }
+  .pollbox { margin:13px 14px 0; background:var(--card); border:1px solid var(--line); border-radius:6px;
+             padding:17px 16px 14px; box-shadow:3px 3px 0 var(--line); }
+  .pollbox .pttl { font-family:"Noto Serif KR",serif; font-size:18px; font-weight:900; margin-bottom:3px; }
+  .pollbox .psub { font-size:11.5px; color:var(--sub); margin-bottom:12px; }
+  .pollbox .popts { display:flex; gap:7px; }
+  .pbtn { flex:1; border:1px solid #cfc5ae; background:#fff; color:var(--ink); border-radius:4px; padding:13px 4px;
+          font-size:13.5px; font-weight:600; cursor:pointer; line-height:1.4;
+          transition:background 200ms var(--spring), color 150ms ease, border-color 150ms ease, transform 120ms ease; }
+  .pbtn:active { transform:translate(1px,1px); }
+  .pbtn.sel { border-color:var(--green); background:var(--green); color:#f3efe6; }
+  .pbtn .psm { display:block; font-weight:400; font-size:10.5px; margin-top:3px; color:#a89e8c; }
+  .pbtn.sel .psm { color:#b9c9c0; }
+  .pbtn .pc { display:block; font-size:12px; font-weight:700; margin-top:3px; color:#a3403a; }
+  .pbtn.sel .pc { color:#e8c96a; }
+  .pmsg { font-size:11.5px; font-weight:500; color:var(--sub); margin-top:10px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .overlay, .modal { animation:none; }
+    * { transition-duration:0.01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="overlay" id="nickOverlay" style="display:none;">
+  <div class="modal" id="nickModal"></div>
+</div>
+
+<div class="overlay" id="menuOverlay" style="display:none;" onclick="if(event.target===this)closeMenu()">
+  <div class="modal">
+    <h2 id="menuTitle" style="margin-bottom:12px;"></h2>
+    <div id="menuRows"></div>
+    <div class="mnote" id="menuNote"></div>
+    <button class="mclose" onclick="closeMenu()">닫기</button>
+  </div>
+</div>
+
+<header>
+  <h1>봉은사 벙 🪷 <span id="nickShow" style="font-size:12px;font-weight:600;color:#8a97a5;"></span></h1>
+  <div class="sub">2026. 8. 9(일) · 8명 · 반야심경 살롱 번개모임<br>동선은 아직 미정 — 후보를 지도에 모아둔 자료판 · ★로 가고 싶은 곳 투표!</div>
+</header>
+<div class="wx">☀️ 그날 날씨: 최고 32.4°C · 오후 2~3시 체감 35°C 피크 · 오후~저녁 소나기 확률↑(38→58%) · 일몰 19:32<br>→ 더운 낮은 실내(보드게임·코엑스), 봉은사·야외는 시원해지는 늦은 오후가 편해요</div>
+
+<div class="daydesc">저녁 전 공통 루트: 보드게임(펀보드·선릉) → 코엑스 → 봉은사(📸 17:30~19:30 추천).<br>저녁은 아래 투표로 결정! 삼성역↔잠실역 2호선 3정거장.</div>
+
+<div class="pollbox">
+  <div class="pttl">🗳️ 저녁 어디서 먹을까요?</div>
+  <div class="psub">익명 · 1인 1표 · 언제든 바꿀 수 있어요. 꼭 눌러주세요!</div>
+  <div class="popts">
+    <button class="pbtn" id="pbtn-j" onclick="voteRoute('j')">잠실 이동<span class="psm">롯데타워·석촌호수</span><span class="pc" id="pc-j"></span></button>
+    <button class="pbtn" id="pbtn-s" onclick="voteRoute('s')">삼성 마무리<span class="psm">코엑스 근처 저녁</span><span class="pc" id="pc-s"></span></button>
+    <button class="pbtn" id="pbtn-x" onclick="voteRoute('x')">상관없음<span class="psm">다 좋아요</span><span class="pc" id="pc-x"></span></button>
+  </div>
+  <div class="pmsg" id="pmsg"></div>
+</div>
+<div id="map"></div>
+
+<div class="cattabs">
+  <div class="ctab" id="ctab-game" onclick="setCat('game')">보드게임</div>
+  <div class="ctab" id="ctab-spot" onclick="setCat('spot')">볼거리</div>
+  <div class="ctab" id="ctab-food" onclick="setCat('food')">식당</div>
+  <div class="ctab" id="ctab-cafe" onclick="setCat('cafe')">카페</div>
+  <div class="ctab" id="ctab-etc" onclick="setCat('etc')">기타</div>
+</div>
+
+<div class="adminbox" id="adminBox" style="display:none;">
+  <div class="ttl"><span>📊 투표 집계 (관리자)</span><button onclick="loadVotes(true);loadRouteCounts()">새로고침</button></div>
+  <div id="adminRoute" class="empty" style="margin-bottom:7px;">저녁 투표 불러오는 중…</div>
+  <div id="adminRows" class="empty">즐겨찾기 불러오는 중…</div>
+</div>
+
+<div id="list"></div>
+
+<footer>장소를 누르면 메뉴·가격/이용료 팝업 · 핀은 개략 위치 · 카카오/네이버 버튼 = 상세 페이지<br>운영시간·가격은 변동 가능, 방문 전 확인 · 체크·즐겨찾기·메모는 자동 저장 · <a href="javascript:void(0)" onclick="resetNick()">로그아웃 · 처음 화면 보기</a></footer>
+
+<script>
+// [이름, 카카오ID(없으면 null), lat, lng, 메모, 태그, opt, 검색어]
+const DATA = {
+  color:'#2f4f42',
+  spot:[
+    ['봉은사',null,37.5148,127.0575,'천년 고찰 · 판전(추사 마지막 글씨)·23m 미륵대불·명상길 · 코엑스 도보 5분','outdoor',false,'봉은사'],
+    ['선정릉',null,37.5089,127.0485,'유네스코 세계유산 왕릉 숲 산책 · 선릉역 500m','outdoor',false,'선정릉'],
+    ['별마당도서관',null,37.5127,127.0592,'13m 서가 포토스팟 · 무료 · 냉방','indoor',false,'코엑스 별마당도서관'],
+    ['코엑스 아쿠아리움',null,37.5124,127.0587,'약 650종 · 더위·비 대피처(유료)','indoor',false,'코엑스아쿠아리움'],
+    ['K-pop 스퀘어 웨이브 전광판',null,37.5107,127.0632,'삼성역 사거리 초대형 3D 파도 미디어아트 · 사진 스팟',null,false,'코엑스 케이팝스퀘어'],
+    ['석촌호수',null,37.5086,127.0995,'호수 한 바퀴 45분~1시간 · 매직아일랜드 뷰 · 타워 포토존','outdoor',false,'석촌호수'],
+    ['송리단길',null,37.5058,127.1085,'석촌호수 옆 골목 핫플 · 맛집·카페 밀집','outdoor',false,'송리단길'],
+    ['서울스카이',null,37.5125,127.1025,'롯데타워 117~123층 전망대 · 야경 명소','view',false,'서울스카이'],
+    ['롯데월드 아쿠아리움',null,37.5126,127.1042,'롯데월드몰 지하 · 실내 대피처(유료)','indoor',false,'롯데월드 아쿠아리움'],
+  ],
+  food:[
+    ['도명골 청국장',null,37.5136,127.0548,'봉은사 도보권 시골밥상 · 대표: 청국장·우렁청국장 · 식사시간 웨이팅',null,false,'도명골청국장'],
+    ['중앙해장',null,37.5106,127.0621,'속 편한 해장 한식 · 대표: 소내장탕·양곰탕·곱창전골',null,false,'중앙해장 삼성'],
+    ['하이디라오 코엑스점',null,37.5119,127.0588,'중국 훠궈 1등 체인 · 대표: 마라·백탕 반반 훠궈, 면 퍼포먼스','check',false,'하이디라오 코엑스'],
+    ['아그라 코엑스점',null,37.5122,127.0585,'정통 인도 레스토랑 · 대표: 버터치킨커리·탄두리치킨·난','indoor',false,'아그라 코엑스'],
+    ['하동관 코엑스몰점','26428654',37.5118,127.0595,'80년 전통 곰탕 명가 · 대표: 곰탕·수육 · 이른 마감 주의','indoor',false,'하동관 코엑스'],
+    ['솥내음 코엑스몰점','710342577',37.5121,127.0594,'솥밥 한식 · 대표: 해물장 솥밥·스테이크 솥밥','indoor',false,'솥내음 코엑스'],
+    ['핫쵸 코엑스점','2088056278',37.5119,127.0584,'즉석 철판 퍼포먼스 · 대표: 히로시마 오코노미야끼·야끼소바 · 바 좌석','indoor',false,'핫쵸 코엑스'],
+    ['더타코부스 NYC 코엑스점','1722049791',37.5123,127.0589,'뉴욕식 멕시칸 · 대표: 비리아 타코 + 주류','indoor',false,'더타코부스 코엑스'],
+    ['플랜튜드 코엑스점','884459004',37.5124,127.0590,'비건 한식 · 대표: 두부비빔밥·베지카레 · 채식 멤버 배려용','indoor',false,'플랜튜드 코엑스'],
+    ['맛자랑 (선릉)',null,37.5052,127.0487,'콩국수 명가 · 대표: 진한 콩국수 · 좌석 많아 단체 편함',null,false,'맛자랑 선릉'],
+    ['단디 (송리단길)',null,37.5062,127.1077,'일본식 덮밥 · 대표: 호르몬동(곱창덮밥)·사케동 · 상시 웨이팅',null,false,'단디 송리단길'],
+    ['고도식 (송리단길)',null,37.5052,127.1090,'숙성 돼지구이 · 대표: 알등심·삼겹살 · 송리단길 대표 고기집 · 웨이팅 잦음',null,false,'고도식 송파'],
+    ['모타운 서울 (송리단길)',null,37.5060,127.1080,'브런치 카페 · 대표: 토스트·수프·티라미수 · 주말 웨이팅',null,false,'모타운서울'],
+  ],
+  cafe:[
+    ['로네펠트 티하우스',null,37.5122,127.0590,'독일 홍차 하우스(코엑스 1층) · 대표: 수십 종 홍차·티푸드 · 조용해서 차담에 딱','indoor',false,'로네펠트 티하우스 코엑스'],
+    ['별마당도서관 카페',null,37.5127,127.0592,'13m 서가 뷰 카페 · 대표: 커피·베이커리 · 자리 경쟁 있음','indoor',false,'코엑스 별마당도서관'],
+    ['런던베이글뮤지엄 잠실점',null,37.5125,127.1028,'롯데월드몰 1층 베이글 성지 · 대표: 쪽파크림치즈 베이글 · 웨이팅 40분+','check',false,'런던베이글뮤지엄 잠실'],
+    ['뷰클런즈 커피 (송리단길)',null,37.5057,127.1082,'북유럽 무드 로스터리 · 대표: 라이트로스팅 필터커피·블렌딩 티',null,false,'뷰클런즈'],
+    ['석촌호수 카페거리',null,37.5080,127.1010,'호수 산책 후 한 잔 · 호수뷰 카페 밀집 거리',null,false,'석촌호수 카페거리'],
+  ],
+  game:[
+    ['펀보드게임카페','1642290671',37.5063,127.0503,'선릉로86길 34 3층 · 선릉역 1번 출구 도보 6분 · VIP룸 있음',null,false,'펀보드게임카페 선릉'],
+  ],
+  etc:[
+    ['봉은사역 (9호선)',null,37.5145,127.0600,'7번 출구 코엑스 연결','station',false,'봉은사역'],
+    ['삼성역 (2호선)',null,37.5088,127.0631,'5·6번 출구 코엑스 연결','station',false,'삼성역'],
+    ['선릉역 (2호선·수인분당)',null,37.5045,127.0489,'펀보드게임카페(1번 출구)·선정릉 기점','station',false,'선릉역'],
+    ['잠실역 (2·8호선)',null,37.5133,127.1001,'롯데월드몰·석촌호수 직결 · 삼성역에서 3정거장','station',false,'잠실역'],
+    ['봉은사 앞 버스정류장',null,37.5142,127.0595,'봉은사로 변 · 노선·실시간은 네이버 버튼으로','bus',false,'봉은사 버스정류장'],
+    ['삼성역 코엑스 버스정류장',null,37.5093,127.0627,'간선·광역 다수 정차','bus',false,'삼성역 버스정류장'],
+    ['선릉역 버스정류장',null,37.5048,127.0492,'테헤란로 변','bus',false,'선릉역 버스정류장'],
+    ['잠실역 버스정류장',null,37.5135,127.1003,'롯데월드몰 앞 · 광역버스 다수','bus',false,'잠실역 버스정류장'],
+    ['코엑스몰 화장실',null,37.5126,127.0592,'별마당 주변 등 몰 곳곳 · 쾌적','wc',false,'코엑스 화장실'],
+    ['봉은사 화장실(해우소)',null,37.5150,127.0577,'경내 진여문 근처','wc',false,'봉은사 화장실'],
+    ['선정릉 화장실',null,37.5093,127.0488,'매표소 부근','wc',false,'선정릉 화장실'],
+    ['석촌호수 공공화장실',null,37.5085,127.0999,'산책로 곳곳','wc',false,'석촌호수 화장실'],
+    ['롯데월드몰 화장실',null,37.5125,127.1026,'각 층마다 · 쾌적','wc',false,'롯데월드몰 화장실'],
+    ['코엑스몰 물품보관함',null,37.5124,127.0590,'짐 맡기고 봉은사 가볍게 다녀오기','locker',false,'코엑스 물품보관함'],
+    ['잠실역 물품보관함',null,37.5133,127.1001,'역사 내 · 잠실 이동 시 활용','locker',false,'잠실역 물품보관함'],
+  ],
+};
+const INFO = {
+  '봉은사':'⏰ 상시 개방 · 무료 · 관람 약 1시간 · 📸 추천 17:30~19:30 — 남향 대불에 서쪽 사이드광, 골든아워 18:30~일몰 19:32, 직후 블루아워 연등샷',
+  '선정릉':'⏰ 06:00~21:00(매표 20시) · 월 휴관 → 8/9 일요일 개방 · 입장 1,000원',
+  '별마당도서관':'⏰ 10:00~22:00 · 무료',
+  '코엑스 아쿠아리움':'⏰ 10:00~20:00(변동) · 유료 · 방문 전 확인',
+  '펀보드게임카페':'⏰ 일 13:00~06:00 · ☎ 02-568-0870 · 8명 · 시간 정해서 알려주면 예약 완료',
+  '서울스카이':'⏰ 10:00~22:00 · 유료 · 일몰 19:32 전후가 야경 명당',
+  '롯데월드 아쿠아리움':'⏰ 10:00~20:00(변동) · 유료 · 방문 전 확인',
+  '도명골 청국장':'⏰ 10:30~21:50 · 성시경 언급 · 단체석 있음',
+  '중앙해장':'⏰ 일 00:00~21:30',
+  '맛자랑 (선릉)':'⏰ 일 11:00~21:50 · 라스트오더 21:20',
+  '단디 (송리단길)':'⏰ 일 11:30~21:00',
+  '고도식 (송리단길)':'⏰ 일 12:00~22:40',
+  '모타운 서울 (송리단길)':'⏰ 일 10:00~18:00 · 저녁 전 마감 주의',
+  '뷰클런즈 커피 (송리단길)':'⏰ 일 12:00~22:00',
+  '하이디라오 코엑스점':'⏰ 심야까지 영업(매장 확인) · 예약 추천',
+  '아그라 코엑스점':'⏰ 코엑스몰 10:30~22:00 기준',
+  '로네펠트 티하우스':'⏰ 코엑스몰 10:30~22:00 기준',
+  '런던베이글뮤지엄 잠실점':'⏰ 롯데월드몰 기준 · 테이블링 원격 줄서기 추천',
+};
+// 메뉴·가격 (카카오맵 등록 메뉴 기준, 2026-08 조회) / 이용료
+const MENU = {
+  '도명골 청국장':[['청국장','9,500원'],['우렁청국장','10,000원'],['차돌청국장','10,000원'],['들깨시래기청국장','10,000원']],
+  '중앙해장':[['한우양선지 해장국','14,000원'],['한우내장탕','16,000원'],['한우1++양지곰탕','16,000원'],['곱창전골(중)','67,000원']],
+  '맛자랑 (선릉)':[['서울3대 콩국수','16,000원'],['비빔국수','12,000원'],['직화낙지덮밥','14,000원'],['산채더덕비빔밥','13,000원']],
+  '단디 (송리단길)':[['호르몬동(곱창덮밥)','13,000원'],['특호르몬동','17,000원'],['사케동','17,000원'],['단디다마고','5,500원']],
+  '고도식 (송리단길)':[['알등심 160g','17,000원'],['삼겹살 160g','17,000원'],['천겹살 180g','16,000원'],['철판볶음밥','7,000원']],
+  '모타운 서울 (송리단길)':[['부라타 & 프렌치 토스트','20,000원'],['머쉬룸 멜트','16,000원'],['아메리카노','5,500원'],['카페 라떼','6,000원']],
+  '뷰클런즈 커피 (송리단길)':[['스웨덴 밀크티','6,800원'],['스웨덴 스윗라떼','7,200원'],['아메리카노','5,800원'],['카페라떼','6,500원']],
+  '런던베이글뮤지엄 잠실점':[['아메리카노','5,000원'],['플랫화이트','6,000원'],['카페라떼','6,000원'],['베이글류','현장 확인']],
+  '로네펠트 티하우스':[['아메리카노','5,000원'],['카푸치노','5,500원'],['에스프레소','4,000원'],['홍차(티팟)','현장 확인']],
+  '펀보드게임카페':[['이용료','매장 문의'],['아메리카노','3,800원'],['카페라떼','4,500원'],['초코라떼','5,000원']],
+  '하동관 코엑스몰점':[['곰탕(보)','17,000원'],['25공 곰탕','25,000원'],['30공 곰탕','30,000원'],['수육(중)','40,000원']],
+  '솥내음 코엑스몰점':[['모듬해물장 솥밥(시그니처)','25,000원'],['스테이크 솥밥','17,900원'],['매콤돼지불고기 솥밥','12,000원']],
+  '핫쵸 코엑스점':[['핫쵸 히로시마 오코노미야끼','18,000원'],['소고기 오코노미야끼','20,000원'],['고추 야끼소바','14,000원'],['파 돈페야끼','11,000원']],
+  '더타코부스 NYC 코엑스점':[['비리아 타코(2P)','14,600원'],['런치 세트(2인)','29,600원'],['라이스포케 세트(1인)','14,500원'],['파히타 타워','58,500원']],
+  '플랜튜드 코엑스점':[['고사리오일스톡파스타','16,900원'],['크럼블두부비빔밥 세트','16,900원'],['프라잉가지베지카레','17,900원']],
+  '하이디라오 코엑스점':[['훠궈 1인 예상','약 3~5만원'],['탕·재료 선택제','']],
+};
+const FEE = {
+  '봉은사':'무료',
+  '선정릉':'입장 1,000원',
+  '별마당도서관':'무료',
+  '코엑스 아쿠아리움':'성인 29,000원',
+  'K-pop 스퀘어 웨이브 전광판':'무료 (길거리)',
+  '석촌호수':'무료',
+  '송리단길':'무료 (거리)',
+  '서울스카이':'성인 약 31,000원 (변동)',
+  '롯데월드 아쿠아리움':'성인 35,000원 · 아쿠아나잇(17시 이후) 20,000원',
+};
+function showMenu(k){
+  const menu = MENU[k], fee = FEE[k];
+  if (!menu && !fee) return;
+  document.getElementById('menuTitle').textContent = k;
+  const rowsEl = document.getElementById('menuRows');
+  if (menu) rowsEl.innerHTML = menu.map(([n,p])=>`<div class="mrow"><span>${n}</span><b>${p}</b></div>`).join('');
+  else rowsEl.innerHTML = `<div class="mrow"><span>이용료</span><b>${fee}</b></div>`;
+  document.getElementById('menuNote').textContent = menu ? '카카오맵 등록 메뉴 기준 · 가격 변동 가능' : '요금 변동 가능 · 방문 전 확인';
+  document.getElementById('menuOverlay').style.display = 'flex';
+}
+function closeMenu(){ document.getElementById('menuOverlay').style.display = 'none'; }
+const TAG = { indoor:['실내','t-indoor'], outdoor:['야외','t-outdoor'], view:['뷰','t-view'], check:['예약','t-check'] };
+const CATICON = { spot:'📍', food:'🍴', cafe:'☕', game:'🎲' };
+const ETCICON = { station:'🚇', bus:'🚌', wc:'🚻', locker:'🧳' };
+const KEY = 'be-course-check-v2';
+let checks = JSON.parse(localStorage.getItem(KEY) || '{}');
+const FKEY = 'be-favs';
+let favs = JSON.parse(localStorage.getItem(FKEY) || '{}');
+function favKey(s){ return s[0]; }
+
+// ---- 닉네임 & 익명 투표 집계 ----
+const NICKKEY = 'be-nick';
+const ADMIN_NICK = '투넬';
+const VOTE_NS = 'bongeunsa-bung-0809-hs';
+const VOTE_API = 'https://api.counterapi.dev/v1/' + VOTE_NS;
+let nick = localStorage.getItem(NICKKEY) || '';
+let VOTES = {};
+function slug(name){ // 장소명 → URL 안전 카운터 키
+  let h = 5381;
+  for (let i=0;i<name.length;i++){ h = ((h*33) ^ name.charCodeAt(i)) >>> 0; }
+  return 'p' + h.toString(36);
+}
+function allPlaces(){
+  const out = [];
+  CATS.forEach(c=>{ (DATA[c]||[]).forEach(s=>out.push(s)); });
+  return out;
+}
+function isAdmin(){ return nick === ADMIN_NICK; }
+// 온보딩 슬라이드
+const NSLIDES = [
+  { e:'🪷', t:'봉은사 벙에 어서오세요!', d:'8/9(일) 모임 준비 앱이에요.<br>갈 만한 후보 장소들을 지도와 목록으로<br>미리 구경할 수 있어요.' },
+  { e:'🗺️', t:'카테고리 탭 & 지도', d:'볼거리 · 식당 · 카페 · 보드게임 탭을 눌러보세요.<br>지도 핀을 누르면 목록과 연결되고,<br>영업시간·웨이팅 정보도 적혀 있어요.' },
+  { e:'💰', t:'메뉴·가격 미리보기', d:'장소의 <b>메뉴/요금</b> 버튼을 누르면<br>대표 메뉴와 가격이 팝업으로 떠요.<br><b>메모</b> 버튼으로 의견도 남길 수 있어요.' },
+  { e:'⭐', t:'투표가 제일 중요해요!', d:'가고 싶은 곳에 <b>★</b>을 눌러주세요 (익명 집계).<br>저녁 장소는 <b>3지선다 투표</b>로 정해요.<br>잠실 이동 / 삼성 마무리 / 상관없음' },
+];
+let nickSlide = 0;
+function renderNickModal(){
+  const m = document.getElementById('nickModal');
+  const dots = NSLIDES.concat([0]).map((_,i)=>`<span style="display:inline-block;width:7px;height:7px;border-radius:50%;margin:0 3px;background:${i===nickSlide?'var(--d1)':'#ddd3c6'}"></span>`).join('');
+  if (nickSlide < NSLIDES.length) {
+    const s = NSLIDES[nickSlide];
+    m.innerHTML = `
+      <div style="font-size:44px;margin-bottom:8px;">${s.e}</div>
+      <h2>${s.t}</h2>
+      <p>${s.d}</p>
+      <div style="margin-bottom:10px;">${dots}</div>
+      <button onclick="nickSlide++;renderNickModal()">다음</button>
+      <div style="margin-top:8px;"><a href="javascript:void(0)" style="font-size:11px;color:#a5b1bd;" onclick="nickSlide=NSLIDES.length;renderNickModal()">건너뛰기</a></div>`;
+  } else {
+    m.innerHTML = `
+      <div style="font-size:44px;margin-bottom:8px;">🙌</div>
+      <h2>닉네임을 입력해 주세요</h2>
+      <p>닉네임은 입장 구분용이에요.<br>투표는 익명으로만 집계돼요.</p>
+      <input id="nickInput" type="text" maxlength="12" placeholder="닉네임" value="${(localStorage.getItem(NICKKEY+'-last')||'').replace(/"/g,'')}" onkeydown="if(event.key==='Enter')enterNick()">
+      <div style="margin:10px 0 0;">${dots}</div>
+      <button onclick="enterNick()">확인, 입장하기!</button>`;
+    setTimeout(()=>{ const el=document.getElementById('nickInput'); if(el) el.focus(); }, 80);
+  }
+}
+function enterNick(){
+  const el = document.getElementById('nickInput');
+  const v = el ? el.value.trim() : '';
+  if (!v) { if(el) el.focus(); return; }
+  nick = v;
+  localStorage.setItem(NICKKEY, nick);
+  applyNick();
+}
+function resetNick(){
+  if (nick) localStorage.setItem(NICKKEY + '-last', nick); // 기기별 마지막 닉네임 기억
+  localStorage.removeItem(NICKKEY);
+  nick = '';
+  nickSlide = 0;
+  applyNick();
+}
+function applyNick(){
+  document.getElementById('nickOverlay').style.display = nick ? 'none' : 'flex';
+  document.getElementById('nickShow').textContent = nick ? nick + '님' : '';
+  const box = document.getElementById('adminBox');
+  box.style.display = isAdmin() ? '' : 'none';
+  loadVotes(false); // 식당·카페 인기순 정렬용 — 집계 숫자 노출은 관리자만
+  if (isAdmin()) loadRouteCounts();
+  renderPoll();
+  if (!nick) renderNickModal();
+}
+function sendVote(name, on){ // 익명: 장소 키와 증감만 전송
+  fetch(`${VOTE_API}/${slug(name)}/${on?'up':'down'}`).catch(()=>{});
+}
+async function loadVotes(manual){
+  const rowsEl = document.getElementById('adminRows');
+  if (manual && isAdmin()) rowsEl.innerHTML = '불러오는 중…';
+  const places = allPlaces();
+  const results = [];
+  for (let i = 0; i < places.length; i += 8) { // 배치 조회 (rate limit 회피)
+    const batch = places.slice(i, i+8);
+    const rs = await Promise.all(batch.map(s =>
+      fetch(`${VOTE_API}/${slug(s[0])}/`).then(r=>r.json()).catch(()=>null)
+    ));
+    results.push(...rs);
+  }
+  VOTES = {};
+  places.forEach((s,i)=>{
+    const r = results[i];
+    if (r && typeof r.count === 'number' && r.count > 0) VOTES[s[0]] = r.count;
+  });
+  if (isAdmin()) {
+    const sorted = Object.entries(VOTES).sort((a,b)=>b[1]-a[1]);
+    rowsEl.className = sorted.length ? '' : 'empty';
+    rowsEl.innerHTML = sorted.length
+      ? sorted.map(([n,c])=>`<div class="rowv"><span>${n}</span><b>♥ ${c}</b></div>`).join('')
+      : '아직 집계된 즐겨찾기가 없어요.';
+  }
+  render();
+}
+
+function favToggle(k){
+  favs[k] = !favs[k];
+  const on = !!favs[k];
+  if (!on) delete favs[k];
+  localStorage.setItem(FKEY, JSON.stringify(favs));
+  sendVote(k, on);
+  render();
+}
+
+// ---- 저녁 루트 투표 (3지선다 · 익명 · 1인 1표) ----
+const RKEY = 'be-route';
+const ROUTE_LABEL = { j:'잠실 이동', s:'삼성에서 마무리', x:'상관없음' };
+let myRoute = localStorage.getItem(RKEY) || '';
+async function voteRoute(k){
+  if (myRoute === k) return;
+  const prev = myRoute;
+  myRoute = k;
+  localStorage.setItem(RKEY, k);
+  renderPoll();
+  try {
+    if (prev) await fetch(`${VOTE_API}/route-${prev}/down`);
+    await fetch(`${VOTE_API}/route-${k}/up`);
+  } catch(e) {}
+  if (isAdmin()) loadRouteCounts();
+}
+function renderPoll(){
+  ['j','s','x'].forEach(k=>{
+    document.getElementById('pbtn-'+k).className = 'pbtn' + (myRoute===k ? ' sel' : '');
+  });
+  document.getElementById('pmsg').textContent = myRoute
+    ? `내 선택: ${ROUTE_LABEL[myRoute]} (익명으로 집계돼요)` : '아직 투표 전이에요.';
+}
+async function loadRouteCounts(){
+  const rs = await Promise.all(['j','s','x'].map(k =>
+    fetch(`${VOTE_API}/route-${k}/`).then(r=>r.json()).catch(()=>null)
+  ));
+  const counts = {};
+  ['j','s','x'].forEach((k,i)=>{
+    const c = (rs[i] && typeof rs[i].count === 'number') ? Math.max(0, rs[i].count) : 0;
+    counts[k] = c;
+    document.getElementById('pc-'+k).textContent = isAdmin() && c > 0 ? `♥ ${c}표` : '';
+  });
+  const el = document.getElementById('adminRoute');
+  if (el) {
+    el.className = '';
+    el.innerHTML = `<div class="rowv"><span>🗳️ 저녁 투표</span><b>잠실 ${counts.j} · 삼성 ${counts.s} · 상관없음 ${counts.x}</b></div>`;
+  }
+}
+const NKEY = 'be-notes';
+let notes = JSON.parse(localStorage.getItem(NKEY) || '{}');
+let selKey = null;
+let scrollSel = false;
+function selPlace(k, lat, lng){
+  selKey = (selKey === k) ? null : k;
+  render();
+  if (selKey) map.panTo([lat, lng]);
+}
+function selFromMap(k, cat){
+  curCat = cat;
+  selKey = (selKey === k) ? null : k;
+  scrollSel = true;
+  render();
+}
+function noteEdit(k, name){
+  const v = prompt(name + ' 메모', notes[k] || '');
+  if (v === null) return;
+  notes[k] = v.trim();
+  localStorage.setItem(NKEY, JSON.stringify(notes));
+  render();
+}
+let curCat = 'game';
+const CATS = ['game','spot','food','cafe','etc'];
+
+const map = L.map('map', {zoomControl:false, attributionControl:false});
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+const layer = L.layerGroup().addTo(map);
+
+function toggle(id, el){
+  checks[id] = !checks[id];
+  if (!checks[id]) delete checks[id];
+  localStorage.setItem(KEY, JSON.stringify(checks));
+  render(); // 확정 항목 최상단 고정 반영
+}
+
+function render(){
+  const cfg = DATA;
+  let stops = [...cfg[curCat]];
+  const isChecked = s => checks['u-'+curCat+'-'+favKey(s)] ? 1 : 0;
+  if (curCat === 'food' || curCat === 'cafe') { // 확정 최상단 → 즐겨찾기 많은 순 (동률은 원래 순서)
+    stops.sort((a,b)=> (isChecked(b)-isChecked(a)) || ((VOTES[b[0]]||0)-(VOTES[a[0]]||0)));
+  } else { // 확정 항목 최상단 고정
+    stops.sort((a,b)=> isChecked(b)-isChecked(a));
+  }
+  document.documentElement.style.setProperty('--accent', cfg.color);
+  document.body.style.setProperty('--accent', cfg.color);
+
+  CATS.forEach(c=>{
+    document.getElementById('ctab-'+c).className = 'ctab' + (c===curCat ? ' on' : '');
+  });
+
+  const list = document.getElementById('list');
+  list.innerHTML = '';
+  stops.forEach((s,i)=>{
+    const id = 'u-'+curCat+'-'+favKey(s);
+    const row = document.createElement('div');
+    row.className = 'stop' + (checks[id] ? ' done' : '') + (favKey(s)===selKey ? ' sel' : '');
+    row.style.setProperty('--accent', cfg.color);
+    const tag = (s[5] && TAG[s[5]]) ? `<span class="tagx ${TAG[s[5]][1]}">${TAG[s[5]][0]}</span>` : '';
+    let badgeHtml;
+    if (curCat==='etc') badgeHtml = `<div class="num ico">${ETCICON[s[5]]||'📌'}</div>`;
+    else badgeHtml = `<div class="num ico">${CATICON[curCat]}</div>`;
+    const kakaoHref = s[1] ? `https://place.map.kakao.com/${s[1]}` : `https://map.kakao.com/?q=${encodeURIComponent(s[7])}`;
+    row.innerHTML = `
+      <div class="chk" onclick="toggle('${id}',this)">✓</div>
+      ${badgeHtml}
+      <div class="info" onclick="selPlace('${favKey(s)}', ${s[2]}, ${s[3]});showMenu('${favKey(s)}')"><div class="nm"><span class="star${favs[favKey(s)]?' on':''}" onclick="event.stopPropagation();favToggle('${favKey(s)}')">★</span>${s[0]}${checks[id]?'<span class="cbadge">확정</span>':''}${tag}${(isAdmin()&&VOTES[s[0]])?`<span class="vbadge">♥${VOTES[s[0]]}</span>`:''}</div><div class="memo">${s[4]}</div>${INFO[s[0]] ? `<div class="memo" style="color:#8a97a5">${INFO[s[0]]}</div>` : ''}${notes[favKey(s)] ? `<div class="unote">📝 ${notes[favKey(s)]}</div>` : ''}</div>
+      <div class="btns">
+        ${(MENU[favKey(s)]||FEE[favKey(s)]) ? `<a class="b-menu" href="javascript:void(0)" onclick="showMenu('${favKey(s)}')">${MENU[favKey(s)]?'메뉴':'요금'}</a>` : ''}
+        <a class="b-map" href="${kakaoHref}">카카오</a>
+        <a class="b-nvr" href="https://map.naver.com/p/search/${encodeURIComponent(s[7])}">네이버</a>
+        <a class="b-note${notes[favKey(s)] ? ' has' : ''}" href="javascript:void(0)" onclick="noteEdit('${favKey(s)}', '${s[0].replace(/'/g,'')}')">메모</a>
+      </div>`;
+    list.appendChild(row);
+  });
+  if (scrollSel && selKey) {
+    const el = list.querySelector('.stop.sel');
+    if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    scrollSel = false;
+  }
+
+  layer.clearLayers();
+
+  function drawMarker(s, cat, active){
+    let label, bg, txtc='#fff', radius='50%';
+    if (cat==='etc') { label=ETCICON[s[5]]||'📌'; bg='#fff'; txtc='#1a2b3c'; radius='8px'; }
+    else if (cat==='food') { label='🍴'; bg='#fff'; txtc='#1a2b3c'; radius='8px'; }
+    else if (cat==='cafe') { label='☕'; bg='#fff'; txtc='#1a2b3c'; radius='8px'; }
+    else if (cat==='game') { label='🎲'; bg='#fff'; txtc='#1a2b3c'; radius='8px'; }
+    else { label='📍'; bg=cfg.color; }
+    const fav = !!favs[favKey(s)];
+    const size = fav ? (active ? 31 : 26) : (active ? 29 : 22);
+    const fs = active ? 13 : 11;
+    let bd = active ? '3.5px solid #fff' : '1.5px solid rgba(120,135,150,.5)';
+    let op = active ? 1 : 0.85;
+    let sh = active ? '0 0 0 2px rgba(0,0,0,.15), 0 3px 8px rgba(0,0,0,.5)' : '0 1px 3px rgba(0,0,0,.3)';
+    if (fav) { bd = (active?'3.5px':'3px') + ' solid #f5b301'; sh = '0 0 0 3px rgba(245,179,1,.35), 0 2px 6px rgba(0,0,0,.4)'; op = 1; }
+    L.marker([s[2],s[3]], {icon: L.divIcon({
+      html:`<div style="width:${size}px;height:${size}px;border-radius:${radius};background:${bg};color:${txtc};font-weight:800;font-size:${fs}px;display:flex;align-items:center;justify-content:center;border:${bd};box-shadow:${sh};opacity:${op}">${label}</div>`,
+      className:'', iconSize:[size,size], iconAnchor:[size/2,size/2]})}).addTo(layer)
+      .on('click',()=>selFromMap(favKey(s), cat));
+  }
+
+  function drawSelected(s, cat){
+    let label, bg, txtc='#fff';
+    if (cat==='etc') { label=ETCICON[s[5]]||'📌'; bg='#fff'; txtc='#1a2b3c'; }
+    else if (cat==='food') { label='🍴'; bg='#fff'; txtc='#1a2b3c'; }
+    else if (cat==='cafe') { label='☕'; bg='#fff'; txtc='#1a2b3c'; }
+    else if (cat==='game') { label='🎲'; bg='#fff'; txtc='#1a2b3c'; }
+    else { label='📍'; bg=cfg.color; }
+    const html = `<div style="display:flex;flex-direction:column;align-items:center;width:150px;">
+      <div style="max-width:146px;background:${cfg.color};color:#fff;font-size:11px;font-weight:800;padding:3px 9px;border-radius:99px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 2px 6px rgba(0,0,0,.35);margin-bottom:3px;">📌 ${s[0]}</div>
+      <div style="width:30px;height:30px;border-radius:${(cat==='spot')?'50%':'9px'};background:${bg};color:${txtc};font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;border:3.5px solid #fff;box-shadow:0 0 0 3px ${cfg.color}66, 0 3px 8px rgba(0,0,0,.5);">${label}</div>
+    </div>`;
+    L.marker([s[2],s[3]], {icon: L.divIcon({html, className:'', iconSize:[150,58], iconAnchor:[75,43]}), zIndexOffset:1000}).addTo(layer)
+      .on('click',()=>selFromMap(favKey(s), cat));
+  }
+
+  let selStop = null, selCat = null;
+  CATS.forEach(c=>{ (cfg[c]||[]).forEach(x=>{ if(favKey(x)===selKey){ selStop=x; selCat=c; } }); });
+  CATS.filter(c=>c!==curCat).forEach(c=>{ (cfg[c]||[]).forEach(s=>{ if(favKey(s)!==selKey) drawMarker(s,c,false); }); });
+  (cfg[curCat]||[]).forEach(s=>{ if(favKey(s)!==selKey) drawMarker(s,curCat,true); });
+  if (selStop) drawSelected(selStop, selCat);
+
+  let boundPts = [];
+  CATS.forEach(c=>{
+    (cfg[c]||[]).forEach(x=>{ if(!x[6]) boundPts.push([x[2],x[3]]); });
+  });
+  map.invalidateSize();
+  if (!window._fitDone) {
+    map.fitBounds(L.latLngBounds(boundPts).pad(0.1));
+    window._fitDone = true;
+  }
+}
+
+function setCat(c){ curCat = c; render(); }
+
+render();
+applyNick();
+setTimeout(()=>{ map.invalidateSize(); render(); }, 200);
+</script>
+</body>
+</html>
