@@ -189,7 +189,7 @@
 
 <div id="list"></div>
 
-<footer>장소를 누르면 메뉴·가격/이용료 팝업 · 핀은 개략 위치 · 카카오/네이버 버튼 = 상세 페이지<br>운영시간·가격은 변동 가능, 방문 전 확인 · 체크·즐겨찾기·메모는 자동 저장 · <a href="javascript:void(0)" onclick="resetNick()">로그아웃 · 처음 화면 보기</a></footer>
+<footer>장소를 누르면 메뉴·가격/이용료 팝업 · 핀은 개략 위치 · 카카오/네이버 버튼 = 상세 페이지<br>운영시간·가격은 변동 가능, 방문 전 확인 · 체크·즐겨찾기·메모는 자동 저장 · <a href="javascript:void(0)" onclick="codeInfo()">내 구분코드</a> · <a href="javascript:void(0)" onclick="resetNick()">로그아웃 · 처음 화면 보기</a></footer>
 
 <script>
 // [이름, 카카오ID(없으면 null), lat, lng, 메모, 태그, opt, 검색어]
@@ -330,8 +330,12 @@ function favKey(s){ return s[0]; }
 // ---- 닉네임 & 익명 투표 집계 ----
 const NICKKEY = 'be-nick';
 const ADMIN_NICK = '투넬';
-const VOTE_NS = 'bongeunsa-bung-0809-hs-v2';
-const VOTE_API = 'https://api.counterapi.dev/v1/' + VOTE_NS;
+const KV = 'https://kvdb.io/DJQNWiVLSeiXfWCAYSyAZz'; // 투표 저장소 (익명 구분코드 기준)
+const CODEKEY = 'be-code';
+const CODE_WORDS = ['연꽃','목탁','풍경','죽비','단청','염주','산문','솔잎','종소리','기와','달빛','수련','약수','바람'];
+function genCode(){ return CODE_WORDS[Math.floor(Math.random()*CODE_WORDS.length)] + (10+Math.floor(Math.random()*90)); }
+let code = localStorage.getItem(CODEKEY) || '';
+if (!code) { code = genCode(); localStorage.setItem(CODEKEY, code); }
 let nick = localStorage.getItem(NICKKEY) || '';
 let VOTES = {};
 function slug(name){ // 장소명 → URL 안전 카운터 키
@@ -351,7 +355,7 @@ const NSLIDES = [
   { e:'🪷', t:'봉은사 벙에 어서오세요!', d:'8/9(일) 모임 준비 앱이에요.<br>갈 만한 후보 장소들을 지도와 목록으로<br>미리 구경할 수 있어요.' },
   { e:'🗺️', t:'카테고리 탭 & 지도', d:'볼거리 · 식당 · 카페 · 보드게임 탭을 눌러보세요.<br>지도 핀을 누르면 목록과 연결되고,<br>영업시간·웨이팅 정보도 적혀 있어요.' },
   { e:'💰', t:'메뉴·가격 미리보기', d:'장소의 <b>메뉴/요금</b> 버튼을 누르면<br>대표 메뉴와 가격이 팝업으로 떠요.<br><b>메모</b> 버튼으로 의견도 남길 수 있어요.' },
-  { e:'⭐', t:'투표가 제일 중요해요!', d:'가고 싶은 곳에 <b>★</b>을 눌러주세요 (익명 집계).<br>저녁 장소는 <b>3지선다 투표</b>로 정해요.<br>잠실 이동 / 삼성 마무리 / 상관없음' },
+  { e:'⭐', t:'투표가 제일 중요해요!', d:'가고 싶은 곳에 <b>★</b>을 눌러주세요.<br>표는 익명 구분코드로만 집계돼요 (1인 1표).<br>저녁 장소는 <b>3지선다 투표</b>로 정해요.' },
 ];
 let nickSlide = 0;
 function renderNickModal(){
@@ -403,32 +407,60 @@ function applyNick(){
   renderPoll();
   if (!nick) renderNickModal();
 }
-function sendVote(name, on){ // 익명: 장소 키와 증감만 전송
-  fetch(`${VOTE_API}/${slug(name)}/${on?'up':'down'}`).catch(()=>{});
+function sendVote(name, on){ // 구분코드 기준 1인 1표: 코드+장소 키만 저장 (닉네임 미전송)
+  const key = `v:${encodeURIComponent(code)}:${slug(name)}`;
+  if (on) fetch(`${KV}/${key}`, {method:'PUT', body:'1'}).catch(()=>{});
+  else fetch(`${KV}/${key}`, {method:'DELETE'}).catch(()=>{});
+}
+function codeInfo(){
+  const v = prompt('내 구분코드: ' + code + '\n\n다른 기기에서도 같은 표로 인정받으려면 그 기기에서 이 코드를 입력하세요. (코드는 익명이에요)', code);
+  if (v === null) return;
+  const nv = v.trim();
+  if (nv && nv !== code) { code = nv.slice(0,20); localStorage.setItem(CODEKEY, code); syncMyVotes(); }
+}
+async function syncMyVotes(){ // 코드 기준 서버 표 → 이 기기 별 표시 동기화
+  try {
+    const r = await fetch(`${KV}/?prefix=${encodeURIComponent('v:'+encodeURIComponent(code)+':')}&format=json`);
+    const keys = await r.json();
+    const mySlugs = new Set(keys.map(k=>k.split(':').pop()));
+    favs = {};
+    allPlaces().forEach(s=>{ if (mySlugs.has(slug(s[0]))) favs[s[0]] = true; });
+    localStorage.setItem(FKEY, JSON.stringify(favs));
+    const rr = await fetch(`${KV}/r:${encodeURIComponent(code)}`);
+    myRoute = rr.ok ? (await rr.text()).trim() : '';
+    localStorage.setItem(RKEY, myRoute);
+  } catch(e) {}
+  renderPoll(); loadVotes(false);
 }
 async function loadVotes(manual){
   const rowsEl = document.getElementById('adminRows');
   if (manual && isAdmin()) rowsEl.innerHTML = '불러오는 중…';
-  const places = allPlaces();
-  const results = [];
-  for (let i = 0; i < places.length; i += 8) { // 배치 조회 (rate limit 회피)
-    const batch = places.slice(i, i+8);
-    const rs = await Promise.all(batch.map(s =>
-      fetch(`${VOTE_API}/${slug(s[0])}/`).then(r=>r.json()).catch(()=>null)
-    ));
-    results.push(...rs);
-  }
+  let keys = [];
+  try {
+    const r = await fetch(`${KV}/?prefix=v:&format=json`);
+    keys = await r.json();
+  } catch(e) { keys = []; }
+  // 키 형식 v:{코드}:{장소슬러그} — 코드는 익명 랜덤
+  const bySlug = {}; const voters = new Set();
+  keys.forEach(k=>{
+    const parts = k.split(':');
+    if (parts.length < 3) return;
+    const sl = parts[parts.length-1]; const cd = parts.slice(1,-1).join(':');
+    voters.add(cd);
+    (bySlug[sl] = bySlug[sl] || new Set()).add(cd);
+  });
   VOTES = {};
-  places.forEach((s,i)=>{
-    const r = results[i];
-    if (r && typeof r.count === 'number' && r.count > 0) VOTES[s[0]] = r.count;
+  allPlaces().forEach(s=>{
+    const set = bySlug[slug(s[0])];
+    if (set && set.size > 0) VOTES[s[0]] = set.size;
   });
   if (isAdmin()) {
     const sorted = Object.entries(VOTES).sort((a,b)=>b[1]-a[1]);
     rowsEl.className = sorted.length ? '' : 'empty';
-    rowsEl.innerHTML = sorted.length
+    rowsEl.innerHTML = (sorted.length
       ? sorted.map(([n,c])=>`<div class="rowv"><span>${n}</span><b>♥ ${c}</b></div>`).join('')
-      : '아직 집계된 즐겨찾기가 없어요.';
+      : '아직 집계된 즐겨찾기가 없어요.')
+      + `<div class="rowv"><span>참여 구분코드</span><b>${voters.size}명</b></div>`;
   }
   render();
 }
@@ -448,14 +480,10 @@ const ROUTE_LABEL = { j:'잠실 이동', s:'삼성에서 마무리', x:'상관�
 let myRoute = localStorage.getItem(RKEY) || '';
 async function voteRoute(k){
   if (myRoute === k) return;
-  const prev = myRoute;
   myRoute = k;
   localStorage.setItem(RKEY, k);
   renderPoll();
-  try {
-    if (prev) await fetch(`${VOTE_API}/route-${prev}/down`);
-    await fetch(`${VOTE_API}/route-${k}/up`);
-  } catch(e) {}
+  try { await fetch(`${KV}/r:${encodeURIComponent(code)}`, {method:'PUT', body:k}); } catch(e) {}
   if (isAdmin()) loadRouteCounts();
 }
 function renderPoll(){
@@ -466,14 +494,14 @@ function renderPoll(){
     ? `내 선택: ${ROUTE_LABEL[myRoute]} (익명으로 집계돼요)` : '아직 투표 전이에요.';
 }
 async function loadRouteCounts(){
-  const rs = await Promise.all(['j','s','x'].map(k =>
-    fetch(`${VOTE_API}/route-${k}/`).then(r=>r.json()).catch(()=>null)
-  ));
-  const counts = {};
-  ['j','s','x'].forEach((k,i)=>{
-    const c = (rs[i] && typeof rs[i].count === 'number') ? Math.max(0, rs[i].count) : 0;
-    counts[k] = c;
-    document.getElementById('pc-'+k).textContent = isAdmin() && c > 0 ? `♥ ${c}표` : '';
+  const counts = {j:0,s:0,x:0};
+  try {
+    const r = await fetch(`${KV}/?prefix=r:&values=true&format=json`);
+    const rows = await r.json();
+    rows.forEach(([k,v])=>{ if (counts[v] !== undefined) counts[v]++; });
+  } catch(e) {}
+  ['j','s','x'].forEach(k=>{
+    document.getElementById('pc-'+k).textContent = isAdmin() && counts[k] > 0 ? `♥ ${counts[k]}표` : '';
   });
   const el = document.getElementById('adminRoute');
   if (el) {
