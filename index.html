@@ -189,7 +189,7 @@
 
 <div id="list"></div>
 
-<footer>장소를 누르면 메뉴·가격/이용료 팝업 · 핀은 개략 위치 · 카카오/네이버 버튼 = 상세 페이지<br>운영시간·가격은 변동 가능, 방문 전 확인 · 체크·즐겨찾기·메모는 자동 저장 · <a href="javascript:void(0)" onclick="codeInfo()">내 구분코드</a> · <a href="javascript:void(0)" onclick="resetNick()">로그아웃 · 처음 화면 보기</a></footer>
+<footer>장소를 누르면 메뉴·가격/이용료 팝업 · 핀은 개략 위치 · 카카오/네이버 버튼 = 상세 페이지<br>운영시간·가격은 변동 가능, 방문 전 확인 · 체크·즐겨찾기·메모는 자동 저장 · <a href="javascript:void(0)" onclick="resetNick()">로그아웃 · 처음 화면 보기</a></footer>
 
 <script>
 // [이름, 카카오ID(없으면 null), lat, lng, 메모, 태그, opt, 검색어]
@@ -330,12 +330,15 @@ function favKey(s){ return s[0]; }
 // ---- 닉네임 & 익명 투표 집계 ----
 const NICKKEY = 'be-nick';
 const ADMIN_NICK = '투넬';
-const KV = 'https://kvdb.io/DJQNWiVLSeiXfWCAYSyAZz'; // 투표 저장소 (익명 구분코드 기준)
-const CODEKEY = 'be-code';
-const CODE_WORDS = ['연꽃','목탁','풍경','죽비','단청','염주','산문','솔잎','종소리','기와','달빛','수련','약수','바람'];
-function genCode(){ return CODE_WORDS[Math.floor(Math.random()*CODE_WORDS.length)] + (10+Math.floor(Math.random()*90)); }
-let code = localStorage.getItem(CODEKEY) || '';
-if (!code) { code = genCode(); localStorage.setItem(CODEKEY, code); }
+const KV = 'https://kvdb.io/DJQNWiVLSeiXfWCAYSyAZz'; // 투표 저장소 (닉네임 파생 코드 기준)
+function calcCode(n){ // 닉네임 → 해시 코드 (같은 닉네임 = 같은 표, 서버엔 이름 대신 코드만)
+  const base = (n||'').replace(/\s/g,'');
+  if (!base) return '';
+  let h1 = 5381, h2 = 52711;
+  for (let i=0;i<base.length;i++){ const c = base.charCodeAt(i); h1 = ((h1*33) ^ c) >>> 0; h2 = ((h2*31) + c) >>> 0; }
+  return 'n' + h1.toString(36) + h2.toString(36);
+}
+let code = '';
 let nick = localStorage.getItem(NICKKEY) || '';
 let VOTES = {};
 function slug(name){ // 장소명 → URL 안전 카운터 키
@@ -355,7 +358,7 @@ const NSLIDES = [
   { e:'🪷', t:'봉은사 벙에 어서오세요!', d:'8/9(일) 모임 준비 앱이에요.<br>갈 만한 후보 장소들을 지도와 목록으로<br>미리 구경할 수 있어요.' },
   { e:'🗺️', t:'카테고리 탭 & 지도', d:'볼거리 · 식당 · 카페 · 보드게임 탭을 눌러보세요.<br>지도 핀을 누르면 목록과 연결되고,<br>영업시간·웨이팅 정보도 적혀 있어요.' },
   { e:'💰', t:'메뉴·가격 미리보기', d:'장소의 <b>메뉴/요금</b> 버튼을 누르면<br>대표 메뉴와 가격이 팝업으로 떠요.<br><b>메모</b> 버튼으로 의견도 남길 수 있어요.' },
-  { e:'⭐', t:'투표가 제일 중요해요!', d:'가고 싶은 곳에 <b>★</b>을 눌러주세요.<br>표는 익명 구분코드로만 집계돼요 (1인 1표).<br>저녁 장소는 <b>3지선다 투표</b>로 정해요.' },
+  { e:'⭐', t:'투표가 제일 중요해요!', d:'가고 싶은 곳에 <b>★</b>을 눌러주세요.<br>같은 닉네임이면 어느 기기서든 1인 1표.<br>저녁 장소는 <b>3지선다 투표</b>로 정해요.' },
 ];
 let nickSlide = 0;
 function renderNickModal(){
@@ -374,7 +377,7 @@ function renderNickModal(){
     m.innerHTML = `
       <div style="font-size:44px;margin-bottom:8px;">🙌</div>
       <h2>닉네임을 입력해 주세요</h2>
-      <p>닉네임은 입장 구분용이에요.<br>투표는 익명으로만 집계돼요.</p>
+      <p>같은 닉네임이면 어느 기기에서든<br>내 표가 그대로 이어져요.</p>
       <input id="nickInput" type="text" maxlength="12" placeholder="닉네임" value="${(localStorage.getItem(NICKKEY+'-last')||'').replace(/"/g,'')}" onkeydown="if(event.key==='Enter')enterNick()">
       <div style="margin:10px 0 0;">${dots}</div>
       <button onclick="enterNick()">확인, 입장하기!</button>`;
@@ -402,21 +405,18 @@ function applyNick(){
   document.getElementById('nickShow').textContent = nick ? nick + '님' : '';
   const box = document.getElementById('adminBox');
   box.style.display = isAdmin() ? '' : 'none';
-  loadVotes(false); // 식당·카페 인기순 정렬용 — 집계 숫자 노출은 관리자만
+  const newCode = calcCode(nick);
+  if (newCode && newCode !== code) { code = newCode; syncMyVotes(); } // 같은 닉네임 = 같은 표 (기기 무관)
+  else loadVotes(false);
   if (isAdmin()) loadRouteCounts();
   renderPoll();
   if (!nick) renderNickModal();
 }
-function sendVote(name, on){ // 구분코드 기준 1인 1표: 코드+장소 키만 저장 (닉네임 미전송)
+function sendVote(name, on){ // 닉네임 파생 코드 기준 1인 1표 (서버엔 해시 코드만)
+  if (!code) return;
   const key = `v:${encodeURIComponent(code)}:${slug(name)}`;
   if (on) fetch(`${KV}/${key}`, {method:'PUT', body:'1'}).catch(()=>{});
   else fetch(`${KV}/${key}`, {method:'DELETE'}).catch(()=>{});
-}
-function codeInfo(){
-  const v = prompt('내 구분코드: ' + code + '\n\n다른 기기에서도 같은 표로 인정받으려면 그 기기에서 이 코드를 입력하세요. (코드는 익명이에요)', code);
-  if (v === null) return;
-  const nv = v.trim();
-  if (nv && nv !== code) { code = nv.slice(0,20); localStorage.setItem(CODEKEY, code); syncMyVotes(); }
 }
 async function syncMyVotes(){ // 코드 기준 서버 표 → 이 기기 별 표시 동기화
   try {
@@ -488,6 +488,7 @@ async function voteRoute(k){
   myRoute = k;
   localStorage.setItem(RKEY, k);
   renderPoll();
+  if (!code) return;
   try { await fetch(`${KV}/r:${encodeURIComponent(code)}`, {method:'PUT', body:k}); } catch(e) {}
   if (isAdmin()) loadRouteCounts();
 }
