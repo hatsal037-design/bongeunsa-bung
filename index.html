@@ -96,7 +96,7 @@
                   color:#f3efe6; background:var(--green); cursor:pointer;
                   transition:transform 120ms ease, filter 150ms ease; }
   .modal button:active { transform:translate(1px,1px); filter:brightness(1.15); }
-  .vbadge { font-size:10px; font-weight:700; color:#f3efe6; background:#a3403a; border-radius:2px; padding:2px 6.5px; margin-left:5px; vertical-align:1px; }
+  .vbadge { font-size:10px; font-weight:700; color:#fff; background:var(--gold); border-radius:2px; padding:2px 6.5px; margin-left:5px; vertical-align:1px; }
   .adminbox { margin:0 14px 12px; background:var(--card); border:1px solid var(--line); border-radius:5px; padding:13px 15px;
               box-shadow:3px 3px 0 var(--line); }
   .adminbox .ttl { font-family:"Noto Serif KR",serif; font-size:13px; font-weight:900; color:var(--green); margin-bottom:8px;
@@ -470,8 +470,13 @@ function favToggle(k){
   const on = !!favs[k];
   if (!on) delete favs[k];
   localStorage.setItem(FKEY, JSON.stringify(favs));
+  // 화면 즉시 반영(낙관적) 후 서버 저장 → 잠시 뒤 실제 집계로 갱신
+  VOTES[k] = Math.max(0, (VOTES[k]||0) + (on ? 1 : -1));
+  if (!VOTES[k]) delete VOTES[k];
   sendVote(k, on);
   render();
+  clearTimeout(window._vtRefresh);
+  window._vtRefresh = setTimeout(()=>loadVotes(false), 900);
 }
 
 // ---- 저녁 루트 투표 (3지선다 · 익명 · 1인 1표) ----
@@ -576,7 +581,7 @@ function render(){
     row.innerHTML = `
       <div class="chk" onclick="toggle('${id}',this)">✓</div>
       ${badgeHtml}
-      <div class="info" onclick="selPlace('${favKey(s)}', ${s[2]}, ${s[3]});showMenu('${favKey(s)}')"><div class="nm"><span class="star${favs[favKey(s)]?' on':''}" onclick="event.stopPropagation();favToggle('${favKey(s)}')">★</span>${s[0]}${checks[id]?'<span class="cbadge">확정</span>':''}${tag}${(isAdmin()&&VOTES[s[0]])?`<span class="vbadge">♥${VOTES[s[0]]}</span>`:''}</div><div class="memo">${s[4]}</div>${INFO[s[0]] ? `<div class="memo" style="color:#8a97a5">${INFO[s[0]]}</div>` : ''}${notes[favKey(s)] ? `<div class="unote">📝 ${notes[favKey(s)]}</div>` : ''}</div>
+      <div class="info" onclick="selPlace('${favKey(s)}', ${s[2]}, ${s[3]});showMenu('${favKey(s)}')"><div class="nm"><span class="star${favs[favKey(s)]?' on':''}" onclick="event.stopPropagation();favToggle('${favKey(s)}')">★</span>${s[0]}${checks[id]?'<span class="cbadge">확정</span>':''}${tag}${VOTES[s[0]]?`<span class="vbadge">★${VOTES[s[0]]}</span>`:''}</div><div class="memo">${s[4]}</div>${INFO[s[0]] ? `<div class="memo" style="color:#8a97a5">${INFO[s[0]]}</div>` : ''}${notes[favKey(s)] ? `<div class="unote">📝 ${notes[favKey(s)]}</div>` : ''}</div>
       <div class="btns">
         ${(MENU[favKey(s)]||FEE[favKey(s)]) ? `<a class="b-menu" href="javascript:void(0)" onclick="showMenu('${favKey(s)}')">${MENU[favKey(s)]?'메뉴':'요금'}</a>` : ''}
         <a class="b-map" href="${kakaoHref}">카카오</a>
